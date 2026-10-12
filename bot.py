@@ -21,8 +21,8 @@ from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 
 # Настройки: токен телеграм-бота и твой API-ключ от Google AI Studio (начинается с AIzaSy...)
-TELEGRAM_TOKEN = "8823906621:AAHA0JBJIaVGwVM-vM_1AMIYdBDrkWGnjCA"
-GEMINI_API_KEY = ""
+TELEGRAM_TOKEN = os.getenv("8823906621:AAHA0JBJIAvGwVM-vM_1AMIYdBDrkWGnjCA")
+GEMINI_API_KEY = os.getenv("AQ.Ab8RN6JxE3en3T2p1NlSoLsjMypMNjqKuqj_bl4G5zpgOi61cw")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
