@@ -15,12 +15,38 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 user_sessions = {}
 user_last_text = {}
 
+# Функция для автоматического поиска рабочей модели Gemini
+def get_best_gemini_model():
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            # Ищем модель flash или ту, которая поддерживает generateContent
+            for m in models:
+                name = m.get("name", "") # приходит в формате "models/gemini-1.5-flash"
+                supported = m.get("supportedGenerationMethods", [])
+                if "generateContent" in supported and "flash" in name:
+                    clean_name = name.split("/")[-1]
+                    print(f"Автоматически выбрана модель Gemini: {clean_name}")
+                    return clean_name
+    except Exception as e:
+        print(f"Не удалось автоматически определить модель: {e}")
+    
+    # Запасной проверенный вариант по умолчанию
+    return "gemini-1.5-flash"
+
+# Получаем актуальную модель при запуске
+ACTIVE_MODEL = get_best_gemini_model()
+
 def ask_gemini(prompt_text):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL}:generateContent"
+    
     headers = {
         "Authorization": f"Bearer {GEMINI_API_KEY}",
         "Content-Type": "application/json"
     }
+    
     payload = {
         "contents": [{
             "parts": [{"text": prompt_text}]
@@ -33,8 +59,10 @@ def ask_gemini(prompt_text):
             data = response.json()
             return data['candidates'][0]['content']['parts'][0]['text']
         else:
+            print(f"Ошибка API ({response.status_code}): {response.text}")
             return "Не получилось обработать запрос, давай попробуем еще раз."
-    except Exception:
+    except Exception as e:
+        print(f"Исключение сети: {e}")
         return "Сеть упала на секунду, повтори сообщение."
 
 def create_pdf(text_content):
@@ -85,10 +113,9 @@ def send_welcome(message):
     user_sessions[chat_id] = {"step": "waiting_topic"}
     bot.reply_to(
         message, 
-        "Привет! Напиши тему, по которой нужно подготовить материал, или прикрепи готовый файл (например, в .txt)."
+        "Привет! Напиши тему, по которой нужно подготовить материал, или прикрепи текстовый файл."
     )
 
-# Обработка входящих текстовых файлов (.txt)
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
     chat_id = message.chat.id
@@ -122,7 +149,7 @@ def handle_document(message):
             
     except Exception as e:
         print(f"Ошибка с файлом: {e}")
-        bot.send_message(chat_id, "Не получилось прочитать этот файл. Попробуй текстовый формат.")
+        bot.send_message(chat_id, "Не получилось прочитать этот файл.")
 
 @bot.message_handler(func=lambda message: True)
 def handle_dialog(message):
@@ -192,5 +219,5 @@ def callback_inline(call):
         bot.send_document(chat_id, document=('presentation.pptx', pptx_file), caption="Держи презентацию.")
 
 if __name__ == "__main__":
-    print("Бот запущен...")
+    print(f"Бот запущен. Активная модель: {ACTIVE_MODEL}")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
